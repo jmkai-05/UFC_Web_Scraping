@@ -16,6 +16,16 @@ def convert_height(height):
 def convert_weight(weight):
     return 100 * int(weight[0]) + 10 * int(weight[1]) + int(weight[2])
 
+conn = pymysql.connect(
+    host='172.26.176.1',
+    port=3306,
+    user=creds.USERNAME,
+    password=creds.PASSWORD,
+    database='mydb'
+)
+
+cursor = conn.cursor()
+
 url = "http://ufcstats.com/statistics/fighters?char=a&page=all"
 
 r = requests.get(url)
@@ -24,77 +34,53 @@ soup = BeautifulSoup(r.content, 'html.parser')
 
 rows = soup.select('tbody tr')
 
-row = rows[1]
+for i in range(1, len(rows) - 1):
+    stats = rows[i].select('td')
 
-names = row.select('.b-link')
+    first_name = stats[0].text.strip()
 
-stats = row.select('td')
+    last_name = stats[1].text.strip()
 
-first_name = stats[0].text.strip()
+    nickname = stats[2].text.strip()
 
-print(first_name)
+    if(nickname == ''):
+        nickname = '--'
 
-last_name = stats[1].text.strip()
+    height = stats[3].text.strip()
 
-print(last_name)
+    if(height == "--"):
+        height = -1
+    else:
+        height = convert_height(height)
 
-nickname = stats[2].text.strip()
+    weight = stats[4].text.strip()
+    
+    if(weight == "--"):
+        weight = -1
+    else:
+        weight = convert_weight(weight)
 
-if(nickname != ''):
-    print(nickname)
-else:
-    print('--')
+    reach = stats[5].text.strip()
 
-# print(stats)
+    if(reach == '--'):
+        reach = -1
+    else:
+        reach = float(reach[0:4])
 
-height = stats[3].text.strip()
-if(height != "--"):
-    height = convert_height(height)
+    stance = stats[6].text.strip()
 
-print(height)
+    if(stance == ''):
+        stance = '--'
 
-weight = stats[4].text.strip()
-if(weight != "--"):
-    weight = convert_weight(weight)
+    wins = int(stats[7].text.strip())
 
-print(weight)
+    losses = int(stats[8].text.strip())
 
-reach = stats[5].text.strip()
+    draws = int(stats[9].text.strip())
 
-print(reach)
+    cursor.execute(
+        "INSERT INTO fighters VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);",
+        (i, first_name, last_name, nickname, height, weight, reach, stance, wins, losses, draws)
+    )
 
-stance = stats[6].text.strip()
-
-if(stance != ''):
-    print(stance)
-else:
-    print('--')
-
-wins = int(stats[7].text.strip())
-
-print(wins)
-
-losses = int(stats[8].text.strip())
-
-print(losses)
-
-draws = int(stats[9].text.strip())
-
-print(draws)
-
-# conn = pymysql.connect(
-#     host='172.26.176.1',
-#     port=3306,
-#     user=creds.USERNAME,
-#     password=creds.PASSWORD,
-#     database='mydb'
-# )
-
-# cursor = conn.cursor()
-
-# cursor.execute(
-#     "INSERT INTO fighters VALUES (%s, %s, %s, %s, %s, %s, %s, %s);",
-#     (first_name, "Hooker", "Switch", 24, 13)
-# )
-
-# conn.commit()
+    conn.commit()
