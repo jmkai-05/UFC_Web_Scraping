@@ -1,101 +1,56 @@
-import time
-import creds
-import pymysql
-import requests
 from bs4 import BeautifulSoup
+import text_funcs
+import time
+import pymysql
+import creds
+import requests
 
-ASCII_OFFSET = 96
+ASCII_OFFSET = 26
 
-def convert_height(height):
-    feet = int(height[0])
-
-    if(height[3] == '"'):
-        inch = int(height[2])
-    else:
-        inch = 10 + int(height[3])
-    
-    return feet * 30.48 + inch * 2.54
-
-def convert_weight(weight):
-    return 100 * int(weight[0]) + 10 * int(weight[1]) + int(weight[2])
-
-with pymysql.connect(
+# connect to local sql server
+conn = pymysql.connect(
     host='172.26.176.1',
     port=3306,
     user=creds.USERNAME,
     password=creds.PASSWORD,
     database='mydb'
-) as conn:
-    with conn.cursor() as cursor:
-        conn.commit()
+)
 
-        fighter_id = 0
+cursor = conn.cursor()
 
-        for j in range(1, 27):
+fighter_id = 0
 
-            url = f"http://ufcstats.com/statistics/fighters?char={chr(j + ASCII_OFFSET)}&page=all"
+for j in range(1, 27):
+    url = f"http://ufcstats.com/statistics/fighters?char={chr(j + ASCII_OFFSET)}&page=all"
 
-            r = requests.get(url)
+    r = requests.get(url)
+    soup = BeautifulSoup(r.content, 'html.parser')
+    rows = soup.select('tbody tr')
 
-            soup = BeautifulSoup(r.content, 'html.parser')
+    for row in rows:
+        stats = row.select('td')
 
-            rows = soup.select('tbody tr')
+        if(len(stats) != 11): continue
 
-            for row in rows:
+        first_name = text_funcs.get_first_name(stats[0])
+        last_name = text_funcs.get_last_name(stats[1])
+        nickname = text_funcs.get_nickname(stats[2])
+        height = text_funcs.get_height(stats[3])
+        weight = text_funcs.get_weight(stats[4])
+        reach = text_funcs.get_reach(stats[5])
+        stance = text_funcs.get_stance(stats[6])
+        wins = text_funcs.get_wins(stats[7])
+        losses = text_funcs.get_losses(stats[8])
+        draws = text_funcs.get_draws(stats[9])
 
-                stats = row.select('td')
+        cursor.execute(
+            "INSERT INTO fighters VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);",
+            (fighter_id, first_name, last_name, nickname, height, weight, reach, stance, wins, losses, draws)
+        )
 
-                if(len(stats) < 4):
-                    continue
+        fighter_id += 1
 
-                fighter_id += 1
+    # prevent overrequesting
+    time.sleep(1)
 
-                first_name = stats[0].text.strip()
-
-                last_name = stats[1].text.strip()
-
-                nickname = stats[2].text.strip()
-
-                if(nickname == ''):
-                    nickname = '--'
-
-                height = stats[3].text.strip()
-
-                if(height == "--"):
-                    height = -1
-                else:
-                    height = convert_height(height)
-
-                weight = stats[4].text.strip()
-                
-                if(weight == "--"):
-                    weight = -1
-                else:
-                    weight = convert_weight(weight)
-
-                reach = stats[5].text.strip()
-
-                if(reach == '--'):
-                    reach = -1
-                else:
-                    reach = float(reach[0:4])
-
-                stance = stats[6].text.strip()
-
-                if(stance == ''):
-                    stance = '--'
-
-                wins = int(stats[7].text.strip())
-
-                losses = int(stats[8].text.strip())
-
-                draws = int(stats[9].text.strip())
-
-                cursor.execute(
-                    "INSERT INTO fighters VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);",
-                    (fighter_id, first_name, last_name, nickname, height, weight, reach, stance, wins, losses, draws)
-                )
-
-                conn.commit()
-            
-            time.sleep(5)
+conn.commit()
