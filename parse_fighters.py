@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 import csv
+import utl
 
 # append data to csv
 def parse_html(html):
@@ -40,15 +41,6 @@ def parse_html(html):
                 fighter.append(stat)
 
             fighters.append(fighter)
+         
+    utl.push_csv(fighters, 'fighters.csv')
 
-                
-
-    # open csv file
-    with open("fighters.csv", "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-
-        # write to csv file
-        for fighter in fighters:
-            writer.writerow(fighter)
-
-            
